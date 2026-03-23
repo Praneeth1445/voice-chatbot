@@ -36,6 +36,9 @@ SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 groq_client = AsyncGroq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 krutrim_client = openai.AsyncOpenAI(api_key=KRUTRIM_API_KEY, base_url="https://cloud.olakrutrim.com/v1") if KRUTRIM_API_KEY else None
 
+# Common words that don't need a web search
+SKIP_SEARCH_WORDS = {"hi", "hello", "hey", "how are you", "who are you", "what's up", "namaste"}
+
 VOICE = "en-US-AriaNeural"
 
 async def text_to_speech_stream(text: str, websocket: WebSocket):
@@ -90,45 +93,43 @@ async def websocket_endpoint(websocket: WebSocket):
                 print(f"User requested: {user_text}")
                 await websocket.send_text(json.dumps({"type": "user_text", "text": user_text}))
                     
-                await websocket.send_text(json.dumps({"type": "status", "message": "Searching the web..."}))
-                
-                # Fetch Real-time 2026 data from SerpAPI or duckduckgo
+                # Only search the web if it's not a simple greeting
                 web_context = ""
-                try:
-                    if SERPAPI_KEY and SERPAPI_KEY != "your_serpapi_key_here":
-                        try:
-                            # Use SerpApi (Google Search Results)
-                            def fetch_serpapi():
-                                url = f"https://serpapi.com/search.json?q={urllib.parse.quote(user_text)}&api_key={SERPAPI_KEY}"
-                                req = urllib.request.Request(url)
-                                with urllib.request.urlopen(req) as response:
-                                    return json.loads(response.read().decode())
-                            
-                            search_res = await asyncio.to_thread(fetch_serpapi)
-                            news_results = search_res.get("news_results", [])
-                            organic_results = search_res.get("organic_results", [])
-                            
-                            if news_results:
-                                for r in news_results[:2]:
-                                    web_context += f"- [NEWS] {r.get('title', '')}: {r.get('snippet', '')}\n"
-                                    
-                            for r in organic_results[:2]:
-                                web_context += f"- {r.get('title', '')}: {r.get('snippet', '')}\n"
-                        except Exception as e:
-                            print(f"SerpApi failed: {e}. Falling back to DuckDuckGo...")
-                            # Fallback to duckduckgo inside catch
+                is_greeting = user_text.lower().strip("?!.") in SKIP_SEARCH_WORDS or len(user_text) < 4
+                
+                if not is_greeting:
+                    await websocket.send_text(json.dumps({"type": "status", "message": "Searching the web..."}))
+                    try:
+                        if SERPAPI_KEY and SERPAPI_KEY != "your_serpapi_key_here":
+                            try:
+                                def fetch_serpapi():
+                                    url = f"https://serpapi.com/search.json?q={urllib.parse.quote(user_text)}&api_key={SERPAPI_KEY}"
+                                    req = urllib.request.Request(url)
+                                    with urllib.request.urlopen(req) as response:
+                                        return json.loads(response.read().decode())
+                                
+                                search_res = await asyncio.to_thread(fetch_serpapi)
+                                news_results = search_res.get("news_results", [])
+                                organic_results = search_res.get("organic_results", [])
+                                
+                                if news_results:
+                                    for r in news_results[:2]:
+                                        web_context += f"- [NEWS] {r.get('title', '')}: {r.get('snippet', '')}\n"
+                                        
+                                for r in organic_results[:2]:
+                                    web_context += f"- {r.get('title', '')}: {r.get('snippet', '')}\n"
+                            except Exception as e:
+                                print(f"SerpApi failed: {e}. Falling back to DuckDuckGo...")
+                                results = await asyncio.to_thread(lambda: list(DDGS().text(user_text, max_results=3)))
+                                for r in results:
+                                    web_context += f"- {r.get('title', '')}: {r.get('body', '')}\n"
+                        else:
                             results = await asyncio.to_thread(lambda: list(DDGS().text(user_text, max_results=3)))
                             for r in results:
                                 web_context += f"- {r.get('title', '')}: {r.get('body', '')}\n"
-                    else:
-                        # Fallback to duckduckgo
-                        results = await asyncio.to_thread(lambda: list(DDGS().text(user_text, max_results=3)))
-                        for r in results:
-                            web_context += f"- {r.get('title', '')}: {r.get('body', '')}\n"
-                except Exception as e:
-                    print(f"Web search failed completely: {e}")
-                    
-                print(f"---\nSearch query: '{user_text}'\nWeb results:\n{web_context}\n---")
+                    except Exception as e:
+                        print(f"Web search failed completely: {e}")
+                    print(f"---\nSearch query: '{user_text}'\nWeb results:\n{web_context}\n---")
                     
                 await websocket.send_text(json.dumps({"type": "status", "message": "Thinking..."}))
                 
@@ -143,6 +144,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if krutrim_client and KRUTRIM_API_KEY:
                     print("Using Krutrim API for generation...")
                     try:
+                        # Try primary AI
                         stream = await krutrim_client.chat.completions.create(
                             messages=[
                                 {"role": "system", "content": system_prompt},
@@ -151,8 +153,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             model="Meta-Llama-3-8B-Instruct",
                             stream=True
                         )
-                    except Exception as kerr:
-                        print(f"Krutrim failed: {kerr}. Falling back to Groq...")
+                    except Exception:
+                        # Silent fallback to Groq if Krutrim fails (e.g. balance error)
                         stream = await groq_client.chat.completions.create(
                             messages=[
                                 {"role": "system", "content": system_prompt},
