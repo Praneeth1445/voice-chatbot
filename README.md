@@ -30,6 +30,7 @@ A highly-responsive, real-time Voice AI Assistant built with React, FastAPI, Gro
 - AsyncGroq / OpenAI Python clients
 - `edge_tts`
 - `ddgs` (DuckDuckGo Live Search Async)
+- **SerpApi** (Google Search Results)
 
 ---
 
