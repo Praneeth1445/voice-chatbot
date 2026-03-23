@@ -17,6 +17,35 @@ A highly-responsive, real-time Voice AI Assistant built with React, FastAPI, Gro
 
 ---
 
+## 📸 App Showcases
+
+### 🔑 1. Secure Authentication Flow
+The journey begins with a stunning, centered glassmorphic login and signup interface, featuring full Firebase integration for secure member access.
+![Login Page](./assets/login_page.png)
+![Signup Page](./assets/signup_page.png)
+
+### 🏠 2. Features & Discovery View
+Once logged in, users are greeted by a premium "Hi" discovery landing that highlights the core system capabilities.
+![Features Overview](./assets/features_grid.png)
+
+### 📖 3. Detailed "How It Works" Guide
+An interactive, step-by-step guidance page helping users master the voice-command mechanics and message editing.
+![Instructions Guide](./assets/how_it_works.png)
+
+### 💬 4. Responsive Chat Interactions
+Experience fluid conversing with the AI on simple facts with instant turnaround.
+![Basic Interaction](./assets/basic_interaction.png)
+
+### 🧠 5. Complex Reasoning & Calculations
+The AI handles multi-step math and detailed logical reasoning with clear explanations.
+![Reasoning Responses](./assets/reasoning_responses.png)
+
+### 🌐 6. Real-Time Search & Current Affairs
+Powered by live Google/DuckDuckGo indexing to fetch current news, politics, and global events in real-time.
+![Live News Search](./assets/live_news_search.png)
+
+---
+
 ## 🛠️ Architecture Stack
 **Frontend Ecosystem**
 - React.js + Vite
